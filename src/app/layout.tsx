@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import Link from 'next/link';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -27,10 +28,10 @@ export default function RootLayout({
                   </div>
                   <div className="hidden md:block">
                     <div className="ml-10 flex items-baseline space-x-4">
-                      <a href="/" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Home</a>
-                      <a href="/practice" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Practice</a>
-                      <a href="/moves" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Moves</a>
-                      <a href="/progress" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Progress</a>
+                      <Link href="/" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Home</Link>
+                      <Link href="/practice" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Practice</Link>
+                      <Link href="/moves" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Moves</Link>
+                      <Link href="/progress" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Progress</Link>
                     </div>
                   </div>
                 </div>

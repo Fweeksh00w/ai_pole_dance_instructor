@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export type Move = {
   id: string;
   name: string;
@@ -137,12 +139,12 @@ export default function MovesPage() {
                 </div>
               </div>
 
-              <a
+              <Link
                 href={`/practice?move=${move.id}`}
                 className="inline-block mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
               >
                 Practice Move
-              </a>
+              </Link>
             </div>
           </div>
         ))}

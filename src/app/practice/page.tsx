@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Webcam from 'react-webcam';
 import * as poseDetection from '@tensorflow-models/pose-detection';
@@ -40,7 +40,6 @@ export default function PracticePage() {
   const [feedback, setFeedback] = useState<Feedback[]>([]);
   const [score, setScore] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
-  const [showingDemo, setShowingDemo] = useState(false);
   const [isDemoPlaying, setIsDemoPlaying] = useState(false);
   const [splitScreen, setSplitScreen] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
@@ -218,7 +217,8 @@ export default function PracticePage() {
     return messages.join('. ');
   };
 
-  const detectPose = async () => {
+  // Make detectPose a useCallback to avoid dependency issues
+  const detectPose = useCallback(async () => {
     if (!detector || !webcamRef.current || !canvasRef.current) return;
 
     const video = webcamRef.current.video;
@@ -257,7 +257,7 @@ export default function PracticePage() {
 
     // Call detectPose again
     requestAnimationFrame(detectPose);
-  };
+  }, [detector, webcamRef, canvasRef, isRecording, analyzePose]);
 
   const drawSkeleton = (ctx: CanvasRenderingContext2D, pose: poseDetection.Pose) => {
     // Draw points
@@ -291,7 +291,7 @@ export default function PracticePage() {
     if (!isLoading) {
       detectPose();
     }
-  }, [isLoading]);
+  }, [isLoading, detectPose]);
 
   return (
     <div className="space-y-6">
