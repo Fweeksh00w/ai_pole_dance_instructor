@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { Suspense, useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Webcam from 'react-webcam';
 import * as poseDetection from '@tensorflow-models/pose-detection';
 import '@tensorflow/tfjs-backend-webgl';
-import { moves, type Move } from '../moves/page';
+import { moves } from '../moves/moves-data';
+import { type Move } from '../moves/types';
 import Avatar from '../components/Avatar';
 import VoiceGuidance from '../components/VoiceGuidance';
 
@@ -28,16 +29,16 @@ type ProgressData = {
   feedback: string[];
 };
 
-export default function PracticePage() {
+function PracticeContent() {
   const searchParams = useSearchParams();
-  const moveId = searchParams.get('move');
+  const moveId = searchParams?.get('move') || '';
   const currentMove = moves.find((m: Move) => m.id === moveId);
 
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [detector, setDetector] = useState<poseDetection.PoseDetector | null>(null);
-  const [feedback, setFeedback] = useState<Feedback[]>([]);
+  const [error, setError] = useState<string>('');
   const [score, setScore] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [isDemoPlaying, setIsDemoPlaying] = useState(false);
@@ -46,26 +47,33 @@ export default function PracticePage() {
   const [currentProgress, setCurrentProgress] = useState<ProgressData[]>([]);
   const [bestScore, setBestScore] = useState<number>(0);
   const [currentVoiceGuide, setCurrentVoiceGuide] = useState<string>('');
+  const [feedback, setFeedback] = useState<Feedback[]>([]);
 
   useEffect(() => {
     const initializePoseDetector = async () => {
-      const model = poseDetection.SupportedModels.BlazePose;
-      const detectorConfig = {
-        runtime: 'tfjs',
-        modelType: 'full',
-        enableSegmentation: true,
-        smoothSegmentation: true
-      };
-      
-      const detector = await poseDetection.createDetector(model, detectorConfig);
-      setDetector(detector);
-      setIsLoading(false);
+      try {
+        const model = poseDetection.SupportedModels.BlazePose;
+        const detectorConfig = {
+          runtime: 'tfjs',
+          modelType: 'full',
+          enableSegmentation: true,
+          smoothSegmentation: true
+        };
+        
+        const detector = await poseDetection.createDetector(model, detectorConfig);
+        setDetector(detector);
+        setIsLoading(false);
+      } catch (err) {
+        console.error('Error initializing pose detector:', err);
+        setError('Failed to initialize pose detection. Please refresh the page.');
+        setIsLoading(false);
+      }
     };
 
     initializePoseDetector();
   }, []);
 
-  const analyzePose = (pose: poseDetection.Pose) => {
+  const analyzePose = useCallback((pose: poseDetection.Pose) => {
     if (!currentMove) return [];
 
     const newFeedback: Feedback[] = [];
@@ -165,7 +173,7 @@ export default function PracticePage() {
     }
 
     return newFeedback;
-  };
+  }, [currentMove]);
 
   const calculateAngle = (point1: Point, point2: Point, point3: Point) => {
     const radians = Math.atan2(point3.y - point2.y, point3.x - point2.x) -
@@ -217,47 +225,53 @@ export default function PracticePage() {
     return messages.join('. ');
   };
 
-  // Make detectPose a useCallback to avoid dependency issues
   const detectPose = useCallback(async () => {
     if (!detector || !webcamRef.current || !canvasRef.current) return;
 
     const video = webcamRef.current.video;
     if (!video || video.readyState !== 4) return;
 
-    // Get video properties
-    const videoWidth = video.videoWidth;
-    const videoHeight = video.videoHeight;
+    try {
+      // Get video properties
+      const videoWidth = video.videoWidth;
+      const videoHeight = video.videoHeight;
 
-    // Set canvas dimensions
-    canvasRef.current.width = videoWidth;
-    canvasRef.current.height = videoHeight;
+      // Set canvas dimensions
+      canvasRef.current.width = videoWidth;
+      canvasRef.current.height = videoHeight;
 
-    // Make pose detection
-    const poses = await detector.estimatePoses(video);
+      // Make pose detection
+      const poses = await detector.estimatePoses(video);
 
-    // Get canvas context for drawing
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
+      // Get canvas context for drawing
+      const ctx = canvasRef.current.getContext('2d');
+      if (!ctx) return;
 
-    // Clear previous drawings
-    ctx.clearRect(0, 0, videoWidth, videoHeight);
+      // Clear previous drawings
+      ctx.clearRect(0, 0, videoWidth, videoHeight);
 
-    if (poses.length > 0) {
-      const pose = poses[0];
-      
-      // Analyze pose and get feedback
-      if (isRecording) {
-        const newFeedback = analyzePose(pose);
-        setFeedback(newFeedback);
+      if (poses.length > 0) {
+        const pose = poses[0];
+        
+        // Analyze pose and get feedback
+        if (isRecording) {
+          const newFeedback = analyzePose(pose);
+          setFeedback(newFeedback);
+        }
+
+        // Draw skeleton
+        drawSkeleton(ctx, pose);
       }
 
-      // Draw skeleton
-      drawSkeleton(ctx, pose);
+      // Call detectPose again
+      if (!error) {
+        requestAnimationFrame(detectPose);
+      }
+    } catch (err) {
+      console.error('Error in pose detection:', err);
+      setError('An error occurred during pose detection. Please refresh the page.');
     }
-
-    // Call detectPose again
-    requestAnimationFrame(detectPose);
-  }, [detector, webcamRef, canvasRef, isRecording, analyzePose]);
+  }, [detector, webcamRef, canvasRef, isRecording, analyzePose, error]);
 
   const drawSkeleton = (ctx: CanvasRenderingContext2D, pose: poseDetection.Pose) => {
     // Draw points
@@ -288,10 +302,27 @@ export default function PracticePage() {
   };
 
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoading && !error) {
       detectPose();
     }
-  }, [isLoading, detectPose]);
+  }, [isLoading, detectPose, error]);
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="bg-red-900/50 border border-red-800 rounded-lg p-6 max-w-md text-center">
+          <h2 className="text-xl font-bold text-white mb-4">Error</h2>
+          <p className="text-red-200">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -449,4 +480,16 @@ export default function PracticePage() {
       )}
     </div>
   );
-} 
+}
+
+export default function PracticePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-white">Loading...</div>
+      </div>
+    }>
+      <PracticeContent />
+    </Suspense>
+  );
+}
